@@ -27,7 +27,7 @@
     "start-server-and-test": "^1.11.6"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "PORT=3006 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
     "cypress:open": "cypress open",

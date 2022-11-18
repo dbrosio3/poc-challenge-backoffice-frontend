@@ -1,12 +1,9 @@
-import { Fragment, useState, useMemo } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { JsonForms } from '@jsonforms/react';
 import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
 import Typography from '@mui/material/Typography';
-import logo from './logo.svg';
 import './App.css';
-import schema from './schema.json';
-import uischema from './uischema.json';
 import {
   materialCells,
   materialRenderers,
@@ -14,6 +11,7 @@ import {
 import RatingControl from './RatingControl';
 import ratingControlTester from './ratingControlTester';
 import { makeStyles } from '@mui/styles';
+import { TextareaAutosize } from '@mui/material';
 
 const useStyles = makeStyles({
   container: {
@@ -28,7 +26,7 @@ const useStyles = makeStyles({
     display: 'flex',
     justifyContent: 'center',
     borderRadius: '0.25em',
-    backgroundColor: '#cecece',
+    backgroundColor: '#fafafa',
     marginBottom: '1rem',
   },
   resetButton: {
@@ -55,25 +53,74 @@ const renderers = [
   { tester: ratingControlTester, renderer: RatingControl },
 ];
 
+const getData = async (id: string) => {
+  const res = await fetch(`http://localhost:3000/back-office/dto/${id}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch data');
+  }
+
+  return res.json();
+};
+
+const getDtoIds = async () => {
+  const res = await fetch(`http://localhost:3000/back-office/dto/`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error('Failed to fetch data');
+  }
+
+  return res.json();
+};
+
 const App = () => {
   const classes = useStyles();
+  const [currentDto, setCurrentDto] = useState(0);
+  const [dtoIds, setDtoIds] = useState<string[]>([]);
   const [data, setData] = useState<any>(initialData);
-  const stringifiedData = useMemo(() => JSON.stringify(data, null, 2), [data]);
+  const [schemas, setSchemas] = useState<any>({});
 
-  const clearData = () => {
-    setData({});
-  };
+  useEffect(() => {
+    getDtoIds().then((dtoIds) => {
+      console.log({ dtoIds });
+      setDtoIds(dtoIds);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (dtoIds.length) {
+      getData(dtoIds[currentDto]).then(({ validationScheme, uiScheme }) => {
+        console.log({ validationScheme, uiScheme });
+        setSchemas({ schema: validationScheme, uischema: uiScheme });
+      });
+    }
+  }, [dtoIds, currentDto]);
 
   return (
     <Fragment>
-      <div className='App'>
-        <header className='App-header'>
-          <img src={logo} className='App-logo' alt='logo' />
-          <h1 className='App-title'>Welcome to JSON Forms with React</h1>
-          <p className='App-intro'>More Forms. Less Code.</p>
-        </header>
-      </div>
-
+      <nav>
+        <Typography variant='h4' className={classes.title}>
+          JSON Forms - Material Renderers
+        </Typography>
+        {dtoIds.map((id, index) => (
+          <Button
+            style={{ textTransform: 'none' }}
+            onClick={() => setCurrentDto(index)}
+          >
+            {id}
+          </Button>
+        ))}
+      </nav>
       <Grid
         container
         justifyContent={'center'}
@@ -82,34 +129,35 @@ const App = () => {
       >
         <Grid item sm={6}>
           <Typography variant={'h4'} className={classes.title}>
-            Bound data
+            Schema
           </Typography>
-          <div className={classes.dataContent}>
-            <pre id='boundData'>{stringifiedData}</pre>
-          </div>
-          <Button
-            className={classes.resetButton}
-            onClick={clearData}
-            color='primary'
-            variant='contained'
-          >
-            Clear data
-          </Button>
+          <TextareaAutosize
+            className={classes.dataContent}
+            value={JSON.stringify(schemas.schema, null, 2)}
+            style={{ width: '80%', margin: '2rem' }}
+          />
         </Grid>
         <Grid item sm={6}>
           <Typography variant={'h4'} className={classes.title}>
             Rendered form
           </Typography>
-          <div className={classes.demoform}>
-            <JsonForms
-              schema={schema}
-              uischema={uischema}
-              data={data}
-              renderers={renderers}
-              cells={materialCells}
-              onChange={({ errors, data }) => setData(data)}
-            />
-          </div>
+          {schemas?.schema && schemas?.uischema ? (
+            <div className={classes.demoform}>
+              <JsonForms
+                schema={schemas.schema}
+                uischema={schemas.uischema}
+                data={data[currentDto]}
+                renderers={renderers}
+                cells={materialCells}
+                onChange={({ errors, data }) => {
+                  console.log(data);
+                  setData({ [currentDto]: data });
+                }}
+              />
+            </div>
+          ) : (
+            <div>Loading...</div>
+          )}
         </Grid>
       </Grid>
     </Fragment>
